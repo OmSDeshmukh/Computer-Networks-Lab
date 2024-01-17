@@ -1,0 +1,89 @@
+Assignment 1
+
+TASK1
+
+1)ping www.google.com
+This receives data packets from the google.com server (here 142.250.70.36) along with the time taken for those packets to reach us. Also, if the server wasn't up and working, then we wouldn't have received any package. It also tells us the RTT. to and from
+
+2) traceroute www.google.com
+This gives us a table containing the list of all the servers the package went through before reaching destination.
+
+3)arp
+This give a one to one mapping of all the ip address and respective mac address of the devices connected to the current network.
+
+4)ifconfig
+This command gives us the information such as ip address, flags,etc of all the ports present on the machine. configuration of a network interface on a device
+
+5)hostname
+Gives the hostname of the current machine
+
+6)
+/etc/hostname
+Contains the hostname of the current device.
+
+/etc/hosts
+Gives the list of all the hostname and ip of hosts present on the current device.
+
+
+/etc/resolv.conf
+File contains ip of name server that can be used for dns resolution.
+
+
+/etc/protocols;
+Gives a list off all the protocols on the current network along with their ip and protocol number
+
+ /etc/services
+Gives us a list of all the services present on the current network along with their port number.
+
+
+TASK 2
+
+i)
+Machines hostname is Oms-MacBook-Air.local. We can get this by using the hostname command in the terminal.
+
+Machine ip is 10.19.8.81 We can obtain this by using ifconfig | grep "inet " command in the terminal
+
+ii)
+10.196.3.250 is the next hop ip which we can get by using the traceroute command in the terminal.
+2:4:96:9a:82:e8 is the mac addres obtained by using the arp 10.196.3.250  command in the terminal
+
+iii)
+10.250.200.3 is the dns server name. Obtained by using the information obtained from the /etc/resolv.conf file.
+
+iv)
+The numbers in the file /etc/protocols represent the protocol number of the different protocols available.
+
+v)
+ssh - 22
+ftp - 21
+nfs - 2049
+smtp - 25
+
+Obtained by using the  cat /etc/services | grep protocol_name command in the terminal
+
+vi)
+I can get the hostname, mac address, ip address and the dns server ip address of my android phone from the settings menu.
+Other directories such as /etc/protocols, /etc/services are not obtainable.
+
+
+TASK 3
+
+i)
+amazon
+64 bytes from 52.84.11.190: icmp_seq=2 ttl=245 time=27.397 ms
+
+iitb
+Request timeout for icmp_seq 0
+
+a) In case of amazon the RTT is 27.397 ms which is the amount of time it takes to reach for the an ip packet to go from my machine to amazon's server and come back.
+
+In case of iitb since the server for that particular domain does not respond, there was a timeout since the packet never came back.
+
+b)amazon's domain names's server exists and hence the packet came back wehre as since iit b domain did not exist the packet never came back and hence no time.
+
+ii) Used! got the varous different servers the packet passed through before reaching the amazon server and comming back.
+
+a)
+b) Use traceroute -m 24 www.amazon.in. here the max number of are set to 24
+c) Whenever we use traceroute, three different packets are sent to each servers coming in between the machine and the final server. Hence, we get 3 different RTT for each of the sent package.
+d) TTL stands for time to live, which tells us the max time(i.e the number of hops) the packet will survive before it gets discarded.

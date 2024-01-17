@@ -1,0 +1,25 @@
+Part-1
+
+1)
+Black identifies TCP packets with problems - for example, they could have been delivered out-of-order.
+
+2)
+Type http in the filtering field of Wireshark to list all the http traffic on the connected on the network.
+
+3)
+DNS uses "Follow UDP Stream" because DNS operates over the User Datagram Protocol (UDP) whereas HTTP uses the Transmission Control Protocol (TCP), which is a connection-oriented protocol. Hence it uses "Follow TCP Stream".
+
+
+
+
+Part-2
+1)TCP, DNS, TLS, DHCP, ARP, QUIC, MDNS
+
+2)0.23745 seconds
+
+3)My computer ip: 10.240.22.74
+Destination ip 15.197.142.173
+
+4)
+
+5)
