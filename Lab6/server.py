@@ -48,7 +48,7 @@ while True:
             data = data_list.encode()
             connection.sendall(data)
     except Exception as e:
-        print("Connection closed by client",e)
+        print("Connection closed by client")
         break
     finally:
         connection.close()
