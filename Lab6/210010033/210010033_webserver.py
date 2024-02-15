@@ -28,7 +28,8 @@ try:
             f = open(filename.split('/')[1])
         except:
             connection.send("HTTP/1.1 404 Not Found\r\n\r\n".encode('ascii'))
-            connection.send("<html><head></head><body><h1>404 Not Found</h1></body></html>\r\n".encode('ascii'))
+            output = "<html><head></head><body><h3>404 Not Found</h3></body></html>\r\n"
+            connection.send(output.encode('ascii'))
             connection.close()
             continue
         output = f.read()
