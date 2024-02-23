@@ -56,3 +56,6 @@ while True:
 print("Server Closing")
 connection.close()
 sock.close()
+
+
+
