@@ -15,51 +15,59 @@ sock.bind(server_address)
 # put socket in listening mode for TCP connections
 sock.listen(5)
 
-client_details = dict()
+client_details = dict() # name : public key
 lock = threading.Lock()
-clients = []  # List to store connected client sockets
+# clients = []  # List to store connected client sockets
+client_socks = dict() # to store the socket : public key mapping
 
 def broadcast_dictionary():
-    while True:
-        updated_client_details_json = json.dumps(client_details)
-        for client_socket in clients:
-            try:
-                client_socket.sendall(updated_client_details_json.encode())
-            except:
-                # Handle any exceptions if the client connection is closed
-                clients.remove(client_socket)
-                
+    updated_client_details_json = json.dumps(client_details)
+    for client_socket in list(client_socks.keys()):
+        try:
+            client_socket.sendall(updated_client_details_json.encode())
+        except:
+            remove_client(client_socket)
+
+def remove_client(client_socket):
+    with lock:
+        if client_socket in client_socks:
+            public_key = client_socks[client_socket]
+            for name, key in list(client_details.items()):
+                if key == public_key:
+                    del client_details[name]
+                    break
+            del client_socks[client_socket]
+            print("Removed client since it closed")
+            # broadcast_dictionary()
+                    
 
 def handle_client_connection(connection, client_address):
     try:
         while True:
-            welcome_string1 = "Enter your name: "
-            connection.sendall(welcome_string1.encode())
+            # welcome_string1 = "Enter your name: "
+            # connection.sendall(welcome_string1.encode())
             name_received = connection.recv(1024).decode()
             print("Name received:", name_received)
             
-            welcome_string2 = "Enter the public key: "
-            connection.sendall(welcome_string2.encode())
-            public_key_received = connection.recv(1024).decode()
+            # welcome_string2 = "Enter the public key: "
+            # connection.sendall(welcome_string2.encode())
+            public_key_received = connection.recv(4096).decode()
             print("Public Key received:", public_key_received)
             
             # Adding client details into the dictionary (thread-safe)
             with lock:
                 client_details[name_received] = public_key_received
+                client_socks[connection] = public_key_received
                 
             print("Current Client Details:", client_details)
             
             # Sending the updated dictionary to the client 
+            # Updating every client
             with lock:
-                client_details_json = json.dumps(client_details)
-            connection.sendall(client_details_json.encode())
-            print("All Client Details sent")
-            
-            # with lock:
-            #     broadcast_thread = threading.Thread(target=broadcast_dictionary)
-            #     broadcast_thread.start()
-            #     broadcast_thread.join()
-            #     print("Client Details Broadcasted")
+                # client_details_json = json.dumps(client_details)
+                broadcast_dictionary()
+            # connection.sendall(client_details_json.encode())
+            print("All Client Updated")
 
     except KeyboardInterrupt:
         print("Server interrupted. Closing connections.")
@@ -70,10 +78,6 @@ def handle_client_connection(connection, client_address):
     finally:
         connection.close()
 
-# Start the broadcast thread
-broadcast_thread = threading.Thread(target=broadcast_dictionary)
-# broadcast_thread.start()
-
 try:
     while True:
         # Accept incoming connections
@@ -81,7 +85,11 @@ try:
         print(f"Connected to client {client_address}")
         
         # Add the client socket to the list of clients
-        clients.append(connection)
+        client_socks[connection] = ""
+        
+        # Broadcast the updated dictionary to all clients upon a new client connection
+        # with lock:
+        #     broadcast_dictionary()
         
         # Create a new thread to handle client connection
         client_thread = threading.Thread(target=handle_client_connection, args=(connection, client_address))

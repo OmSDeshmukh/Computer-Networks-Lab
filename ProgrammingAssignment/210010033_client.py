@@ -45,7 +45,7 @@ try:
     private_key, public_key = generate_rsa_key_pair()
     
     # sending the public key to the server
-    welcome_string2 = sock.recv(1024).decode()
+    welcome_string2 = sock.recv(4096).decode()
     if(welcome_string2 == "Enter the public key: "):
         sock.sendall(public_key)
         print("Public key sent")
