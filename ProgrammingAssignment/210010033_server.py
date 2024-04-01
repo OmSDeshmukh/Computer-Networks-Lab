@@ -20,25 +20,39 @@ lock = threading.Lock()
 # clients = []  # List to store connected client sockets
 client_socks = dict() # to store the socket : public key mapping
 
-def broadcast_dictionary():
-    updated_client_details_json = json.dumps(client_details)
+def broadcast_dictionary(*args):
+    if(len(args)==0):
+        message = {
+            "identifier": "broadcast_message",  # Use a suitable identifier value
+            "data": client_details
+        }
+    elif(len(args)==1):
+        message = {
+            "identifier": "AFK",  # Use a suitable identifier value
+            "data": client_details,
+            "name": args[0]
+        }
+    updated_client_details_json = json.dumps(message)
     for client_socket in list(client_socks.keys()):
         try:
+            # broadcast only to the other clients HANDLE ITTTTTT
             client_socket.sendall(updated_client_details_json.encode())
         except:
             remove_client(client_socket)
 
 def remove_client(client_socket):
     with lock:
+        temp = ""
         if client_socket in client_socks:
             public_key = client_socks[client_socket]
             for name, key in list(client_details.items()):
                 if key == public_key:
+                    temp = name
                     del client_details[name]
                     break
             del client_socks[client_socket]
             print("Removed client since it closed")
-            # broadcast_dictionary()
+            broadcast_dictionary(temp)
                     
 
 def handle_client_connection(connection, client_address):
@@ -68,6 +82,16 @@ def handle_client_connection(connection, client_address):
                 broadcast_dictionary()
             # connection.sendall(client_details_json.encode())
             print("All Client Updated")
+            
+            message = connection.recv(1024).decode()
+            if(message=="QUIT"):
+                message = {
+                    "identifier": "Disconnection"  # Use a suitable identifier value
+                }
+                connection.sendall(json.dumps(message).encode())
+                remove_client(connection)
+                client_thread.interrupt()
+            
 
     except KeyboardInterrupt:
         print("Server interrupted. Closing connections.")

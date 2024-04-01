@@ -6,16 +6,26 @@ import threading
 from key_generation import generate_rsa_key_pair
 import time
 
+client_details = dict()
+
 def receive_updates_from_server(sock):
     while True:
         try:
-            data = sock.recv(4096)
-            # if not data:
-            #     break
+            data = sock.recv(65536)
             updated_client_details = json.loads(data.decode())
-            print("Received updated client details:", updated_client_details)
+        
+            if(updated_client_details["identifier"]=="broadcast_message"):
+                print("Received updated client details:", updated_client_details["data"])
+                client_details = updated_client_details["data"]
+            elif(updated_client_details["identifier"]=="Disconnection"):
+                print("Disconnected from server")
+                break
+            elif(updated_client_details["identifier"]=="AFK"):
+                name = updated_client_details["name"]
+                client_details = updated_client_details["data"]
+                print(f"{name} Left the chat")
         except Exception as e:
-            print("Error receiving data 7 from server:", e)
+            print("Error receiving data from server:", e)
             break
         
         
@@ -29,7 +39,6 @@ sock.connect(server_address)
 
 # Start a thread to receive updates from the server
 receive_thread = threading.Thread(target=receive_updates_from_server, args=(sock,))
-
 
 try:
     # Send the client's name
@@ -46,9 +55,16 @@ try:
     
     receive_thread.start()
     
+    # choice = input("Enter the client you want to talk to")
+    # print("Here are the names")
+    # print(client_details.keys())
+    
     i = int(input("Enter one to disconnect"))
     if i==1:
+        sock.sendall("QUIT".encode())
+        receive_thread.join()
         sock.close()
+
     # Wait for threads to complete
     # send_thread.join()
     # receive_thread.join()
