@@ -104,7 +104,12 @@ try:
                 print("Incorrect Name Please enter again\n")
                 
         if(choice == 2):
-            pass
+            data = {
+                "identifier" : "Video",
+                "message" : "List videos"
+            }
+            data_json = json.dumps(data)
+            sock.sendall(data_json.encode())
         
         if(choice == 3):
             data = {

@@ -108,7 +108,8 @@ def handle_client_connection(connection, client_address):
             if(message_json["identifier"]=="Communication"):
                 print("Incoming message from: ",message_json["from"])
                 broadcast_dictionary(message_json["encrypt_message"],message_json["from"])
-                # pass
+            if(message_json["identifier"]=="Video"):
+                pass
             
 
     except KeyboardInterrupt:
