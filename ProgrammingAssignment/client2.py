@@ -7,6 +7,7 @@ from key_generation import generate_rsa_key_pair
 from key_generation import encrypt_string
 from key_generation import decrypt_string
 import time
+import base64
 
 global client_details
 client_details = dict()
@@ -23,20 +24,24 @@ def receive_updates_from_server(sock):
             if(updated_client_details["identifier"]=="broadcast_message"):
                 print("Received updated client details \n")
                 client_details = updated_client_details["data"]
+                
             elif(updated_client_details["identifier"]=="Disconnection"):
                 print("Disconnected from server\n")
                 break
+            
             elif(updated_client_details["identifier"]=="AFK"):
                 name = updated_client_details["name"]
                 client_details = updated_client_details["data"]
                 print(f"{name} Left the chat\n")
                 print("Received updated client details \n")
+                
             elif(updated_client_details["identifier"]=="Communication"):
-                encrypt_message_r = updated_client_details["encrypt_message"]
+                encrypt_message_base64_r = updated_client_details["encrypt_message"]
+                encrypt_message_r = base64.b64decode(encrypt_message_base64_r)
                 try:
                     decrpyted_message = decrypt_string(encrypt_message_r, private_key)
-                    print("Message received from:",updated_client_details["from"])
-                    print("Message", decrpyted_message)
+                    print("Message received from: ",updated_client_details["from"])
+                    print("Message: ", decrpyted_message)
                 except:
                     print("Message not for us!\n")
         except Exception as e:
@@ -84,20 +89,21 @@ try:
                 pk = client_details[name]
                 
                 message = input("Enter the message you want to send to the client\n")
-                encrypt_message = encrypt_string(message,public_key)
-                print(encrypt_message)
+                encrypt_message = encrypt_string(message,pk)
+                encrypt_message_base64 = base64.b64encode(encrypt_message).decode()
                 data = {
                     "identifier" : "Communication",
-                    "encrypt_message" : encrypt_message,
+                    "encrypt_message" : encrypt_message_base64,
                     "from": client_name
                 }
                 data_json = json.dumps(data)
                 sock.sendall(data_json.encode())
             else:
                 print("Incorrect Name Please enter again\n")
+                
         if(choice == 2):
             pass
-    # choice = int(input("Enter 3 to quit"))
+        
         if(choice == 3):
             data = {
                 "identifier":"QUIT"

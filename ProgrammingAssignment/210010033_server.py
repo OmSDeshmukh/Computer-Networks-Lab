@@ -37,7 +37,7 @@ def broadcast_dictionary(*args):
         }
     elif(len(args)==2):
         message = {
-            "identifier" : "Connection",
+            "identifier" : "Communication",
             "encrypt_message" : args[0],
             "from" : args[1]
         }
@@ -46,7 +46,6 @@ def broadcast_dictionary(*args):
         try:
             # broadcast only to the other clients HANDLE ITTTTTT
             client_socket.sendall(updated_client_details_json.encode())
-            # print("Hi")
         except:
             remove_client(client_socket)
 
@@ -64,35 +63,37 @@ def remove_client(client_socket):
             del client_socks[client_socket]
             print("Removed client since it closed")
             broadcast_dictionary(temp)
+            
+# def handle_message_received()
                     
 
 def handle_client_connection(connection, client_address):
     try:
-        while True:
-            # welcome_string1 = "Enter your name: "
-            # connection.sendall(welcome_string1.encode())
-            name_received = connection.recv(1024).decode()
-            print("Name received:", name_received)
-            
-            # welcome_string2 = "Enter the public key: "
-            # connection.sendall(welcome_string2.encode())
-            public_key_received = connection.recv(4096).decode()
-            print("Public Key received:", public_key_received)
-            
-            # Adding client details into the dictionary (thread-safe)
-            with lock:
-                client_details[name_received] = public_key_received
-                client_socks[connection] = public_key_received
-                
-            print("Current Client Details:", client_details)
-            
-            # Sending the updated dictionary to the client 
-            # Updating every client
-            with lock:
-                broadcast_dictionary()
-                print("All Client Updated")
-            
         # while True:
+        # welcome_string1 = "Enter your name: "
+        # connection.sendall(welcome_string1.encode())
+        name_received = connection.recv(1024).decode()
+        print("Name received:", name_received)
+        
+        # welcome_string2 = "Enter the public key: "
+        # connection.sendall(welcome_string2.encode())
+        public_key_received = connection.recv(4096).decode()
+        print("Public Key received:", public_key_received)
+        
+        # Adding client details into the dictionary (thread-safe)
+        with lock:
+            client_details[name_received] = public_key_received
+            client_socks[connection] = public_key_received
+            
+        print("Current Client Details:", client_details)
+        
+        # Sending the updated dictionary to the client 
+        # Updating every client
+        with lock:
+            broadcast_dictionary()
+            print("All Client Updated")
+            
+        while True:
             message = connection.recv(4096).decode()
             message_json = json.loads(message)
             if(message_json["identifier"]=="QUIT"):
