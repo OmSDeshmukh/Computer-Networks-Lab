@@ -39,6 +39,9 @@ def broadcast_dictionary(*args):
             client_socket.sendall(updated_client_details_json.encode())
         except:
             remove_client(client_socket)
+    
+    print("All broadcasted")
+
 
 def remove_client(client_socket):
     with lock:
@@ -110,10 +113,6 @@ try:
         
         # Add the client socket to the list of clients
         client_socks[connection] = ""
-        
-        # Broadcast the updated dictionary to all clients upon a new client connection
-        # with lock:
-        #     broadcast_dictionary()
         
         # Create a new thread to handle client connection
         client_thread = threading.Thread(target=handle_client_connection, args=(connection, client_address))

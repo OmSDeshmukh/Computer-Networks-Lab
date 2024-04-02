@@ -1,5 +1,7 @@
-from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.primitives.asymmetric import rsa, padding
 from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import utils
+from cryptography.hazmat.primitives import hashes
 
 # Generate RSA key pair
 def generate_rsa_key_pair():
@@ -24,13 +26,44 @@ def generate_rsa_key_pair():
 
     return private_pem, public_pem
 
+# Encrypt a string using RSA public key
+def encrypt_string(message, public_key):
+    public_key = public_key.encode() #since the dictionary stores a decoded version of the public key
+    public_key_obj = serialization.load_pem_public_key(public_key)
+    ciphertext = public_key_obj.encrypt(
+        message.encode(),
+        padding.OAEP(
+            mgf=padding.MGF1(algorithm=hashes.SHA256()),
+            algorithm=hashes.SHA256(),
+            label=None
+        )
+    )
+    return ciphertext
+
+# Decrypt RSA encrypted data using private key
+def decrypt_string(ciphertext, private_key):
+    private_key_obj = serialization.load_pem_private_key(
+        private_key,
+        password=None
+    )
+    plaintext = private_key_obj.decrypt(
+        ciphertext,
+        padding.OAEP(
+            mgf=padding.MGF1(algorithm=hashes.SHA256()),
+            algorithm=hashes.SHA256(),
+            label=None
+        )
+    )
+    return plaintext.decode()
+
 # Example usage
 # private_key, public_key = generate_rsa_key_pair()
 
-# Print the private key and public key in PEM format
-# print("Private Key:")
-# print(private_key.decode())
+# # Encrypt a message
+# message = "Hello, world!"
+# encrypted_data = encrypt_string(message, public_key.decode())
+# print("Encrypted:", encrypted_data)
 
-
-# print("Public Key:")
-# print(public_key.decode())
+# # Decrypt the encrypted data
+# decrypted_message = decrypt_string(encrypted_data, private_key)
+# print("Decrypted:", decrypted_message)

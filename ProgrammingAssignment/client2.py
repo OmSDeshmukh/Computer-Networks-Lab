@@ -4,29 +4,35 @@ import random
 import json
 import threading
 from key_generation import generate_rsa_key_pair
+from key_generation import encrypt_string
 import time
 
+global client_details
 client_details = dict()
+lock = threading.Lock()
 
 def receive_updates_from_server(sock):
-    while True:
-        try:
-            data = sock.recv(65536)
-            updated_client_details = json.loads(data.decode())
-        
-            if(updated_client_details["identifier"]=="broadcast_message"):
-                print("Received updated client details:", updated_client_details["data"])
-                client_details = updated_client_details["data"]
-            elif(updated_client_details["identifier"]=="Disconnection"):
-                print("Disconnected from server")
+    global client_details
+    with lock:
+        while True:
+            try:
+                data = sock.recv(65536)
+                updated_client_details = json.loads(data.decode())
+            
+                if(updated_client_details["identifier"]=="broadcast_message"):
+                    print("Received updated client details \n")
+                    client_details = updated_client_details["data"]
+                elif(updated_client_details["identifier"]=="Disconnection"):
+                    print("Disconnected from server\n")
+                    break
+                elif(updated_client_details["identifier"]=="AFK"):
+                    name = updated_client_details["name"]
+                    client_details = updated_client_details["data"]
+                    print(f"{name} Left the chat\n")
+                    print("Received updated client details \n")
+            except Exception as e:
+                print("Error receiving data from server:", e)
                 break
-            elif(updated_client_details["identifier"]=="AFK"):
-                name = updated_client_details["name"]
-                client_details = updated_client_details["data"]
-                print(f"{name} Left the chat")
-        except Exception as e:
-            print("Error receiving data from server:", e)
-            break
         
         
 # Create a TCP/IP socket
@@ -55,15 +61,32 @@ try:
     
     receive_thread.start()
     
-    # choice = input("Enter the client you want to talk to")
-    # print("Here are the names")
-    # print(client_details.keys())
-    
-    i = int(input("Enter one to disconnect"))
-    if i==1:
-        sock.sendall("QUIT".encode())
-        receive_thread.join()
-        sock.close()
+    while True:
+        # Printing Choices
+        choice = int(input("Enter \n 1 to Talk to client \n 2 to Stream Video \n 3 to QUIT \n"))
+        
+        if(choice == 1):
+            print("Here are the names")
+            with lock:
+                print(client_details.keys())
+                name = input("Enter the client you want to talk to: \n")
+                if(name in list(client_details.keys())):
+                    # taking the client details you want to connect to
+                    pk = client_details[name]
+                    
+                    message = input("Enter the message you want to send to the client\n")
+                    encrypt_message = encrypt_string(message,public_key)
+                    
+                else:
+                    print("Incorrect Name Please enter again\n")
+        if(choice == 2):
+            pass
+    # choice = int(input("Enter 3 to quit"))
+        if(choice == 3):
+            sock.sendall("QUIT".encode())
+            receive_thread.join()
+            sock.close()
+            break
 
     # Wait for threads to complete
     # send_thread.join()
