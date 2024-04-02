@@ -3,6 +3,13 @@ import sys
 import json
 import threading
 
+# Constants for message identifiers
+class MessageTypes:
+    BROADCAST = "broadcast_message"
+    AFK = "AFK"
+    COMMUNICATION = "Communication"
+    QUIT = "QUIT"
+    
 # Create a TCP/IP socket
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 sock.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1)
@@ -18,39 +25,27 @@ sock.listen(5)
 global client_details
 client_details = dict() # name : public key
 lock = threading.Lock()
-# clients = []  # List to store connected client sockets
 client_socks = dict() # to store the socket : public key mapping
 
 # best to calculate all the messages outside this function and use this only for braodcasting
-def broadcast_dictionary(*args):
-    global client_details, client_socks
-    # with lock: # gimini
-    if(len(args)==0):
-        message = {
-            "identifier": "broadcast_message",  # Use a suitable identifier value
-            "data": client_details
-        }
-    elif(len(args)==1):
-        message = {
-            "identifier": "AFK",  # Use a suitable identifier value
-            "data": client_details,
-            "name": args[0]
-        }
-    elif(len(args)==2):
-        message = {
-            "identifier" : "Communication",
-            "encrypt_message" : args[0],
-            "from" : args[1]
-        }
-    updated_client_details_json = json.dumps(message)
+def broadcast(message_json):
+    global client_details,client_socks
     for client_socket in list(client_socks.keys()):
         try:
             # broadcast only to the other clients HANDLE ITTTTTT
-            client_socket.sendall(updated_client_details_json.encode())
+            client_socket.sendall(message_json.encode())
         except:
             remove_client(client_socket)
 
-
+def broadcast_dictionary():
+    global client_details
+    message = {
+            "identifier": MessageTypes.BROADCAST,  # Use a suitable identifier value
+            "data": client_details
+        }
+    message_json = json.dumps(message)
+    broadcast(message_json)
+    
 def remove_client(client_socket):
     global client_details, client_socks
     with lock:
@@ -64,20 +59,38 @@ def remove_client(client_socket):
                     break
             del client_socks[client_socket]
             print("Removed client since it closed")
-            broadcast_dictionary(temp)
+            message = {
+                "identifier": MessageTypes.AFK,  # Use a suitable identifier value
+                "data": client_details,
+                "name": temp
+            }
+            message_json = json.dumps(message)
+            broadcast(message_json)
                     
-
+def send_to_single_client(connection, message_json):
+    connection.sendall(message_json.encode())
+    remove_client(connection)
+    client_thread.interrupt()
+    
+def handle_message(connection, message_json):
+    if(message_json["identifier"]==MessageTypes.QUIT):
+        message = {
+            "identifier": MessageTypes.QUIT  # Use a suitable identifier value
+        }
+        message_json = json.dumps(message)
+        send_to_single_client(connection, message_json)
+        # move this into the broadcast function
+        
+    if(message_json["identifier"]==MessageTypes.COMMUNICATION):
+        print("Incoming message from: ",message_json["from"])
+        broadcast(message_json)
+    
+    
 def handle_client_connection(connection, client_address):
-    global client_details, client_socks
     try:
-        # while True:
-        # welcome_string1 = "Enter your name: "
-        # connection.sendall(welcome_string1.encode())
         name_received = connection.recv(1024).decode()
         print("Name received:", name_received)
         
-        # welcome_string2 = "Enter the public key: "
-        # connection.sendall(welcome_string2.encode())
         public_key_received = connection.recv(4096).decode()
         print("Public Key received:", public_key_received)
         
@@ -88,7 +101,6 @@ def handle_client_connection(connection, client_address):
             
         print("Current Client Details:", client_details)
         
-        # Sending the updated dictionary to the client 
         # Updating every client
         with lock:
             broadcast_dictionary()
@@ -97,18 +109,7 @@ def handle_client_connection(connection, client_address):
         while True:
             message = connection.recv(4096).decode()
             message_json = json.loads(message)
-            if(message_json["identifier"]=="QUIT"):
-                # move this into the broadcast function
-                message = {
-                    "identifier": "Disconnection"  # Use a suitable identifier value
-                }
-                connection.sendall(json.dumps(message).encode())
-                remove_client(connection)
-                client_thread.interrupt()
-            if(message_json["identifier"]=="Communication"):
-                print("Incoming message from: ",message_json["from"])
-                broadcast_dictionary(message_json["encrypt_message"],message_json["from"])
-                # pass
+            handle_message(connection, message_json)
             
 
     except KeyboardInterrupt:

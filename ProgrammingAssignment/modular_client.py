@@ -9,6 +9,12 @@ from key_generation import decrypt_string
 import time
 import base64
 
+class MessageTypes:
+    BROADCAST = "broadcast_message"
+    AFK = "AFK"
+    COMMUNICATION = "Communication"
+    QUIT = "QUIT"
+
 global client_details
 client_details = dict()
 lock = threading.Lock()
@@ -21,23 +27,21 @@ def receive_updates_from_server(sock):
             data = sock.recv(65536)
             updated_client_details = json.loads(data.decode())
         
-            if(updated_client_details["identifier"]=="broadcast_message"):
+            if(updated_client_details["identifier"]==MessageTypes.BROADCAST):
                 print("Received updated client details \n")
-                # with lock: #gimini
                 client_details = updated_client_details["data"]
                 
-            elif(updated_client_details["identifier"]=="Disconnection"):
+            elif(updated_client_details["identifier"]==MessageTypes.QUIT):
                 print("Disconnected from server\n")
                 break
             
-            elif(updated_client_details["identifier"]=="AFK"):
+            elif(updated_client_details["identifier"]==MessageTypes.AFK):
                 name = updated_client_details["name"]
-                # with lock:
                 client_details = updated_client_details["data"]
                 print(f"{name} Left the chat\n")
                 print("Received updated client details \n")
                 
-            elif(updated_client_details["identifier"]=="Communication"):
+            elif(updated_client_details["identifier"]==MessageTypes.COMMUNICATION):
                 encrypt_message_base64_r = updated_client_details["encrypt_message"]
                 encrypt_message_r = base64.b64decode(encrypt_message_base64_r)
                 try:
@@ -94,7 +98,7 @@ try:
                 encrypt_message = encrypt_string(message,pk)
                 encrypt_message_base64 = base64.b64encode(encrypt_message).decode()
                 data = {
-                    "identifier" : "Communication",
+                    "identifier" : MessageTypes.COMMUNICATION,
                     "encrypt_message" : encrypt_message_base64,
                     "from": client_name
                 }
@@ -108,7 +112,7 @@ try:
         
         if(choice == 3):
             data = {
-                "identifier":"QUIT"
+                "identifier":MessageTypes.QUIT
             }
             data_json = json.dumps(data)
             sock.sendall(data_json.encode())
