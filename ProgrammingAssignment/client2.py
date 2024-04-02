@@ -5,6 +5,7 @@ import json
 import threading
 from key_generation import generate_rsa_key_pair
 from key_generation import encrypt_string
+from key_generation import decrypt_string
 import time
 
 global client_details
@@ -13,26 +14,34 @@ lock = threading.Lock()
 
 def receive_updates_from_server(sock):
     global client_details
-    with lock:
-        while True:
-            try:
-                data = sock.recv(65536)
-                updated_client_details = json.loads(data.decode())
-            
-                if(updated_client_details["identifier"]=="broadcast_message"):
-                    print("Received updated client details \n")
-                    client_details = updated_client_details["data"]
-                elif(updated_client_details["identifier"]=="Disconnection"):
-                    print("Disconnected from server\n")
-                    break
-                elif(updated_client_details["identifier"]=="AFK"):
-                    name = updated_client_details["name"]
-                    client_details = updated_client_details["data"]
-                    print(f"{name} Left the chat\n")
-                    print("Received updated client details \n")
-            except Exception as e:
-                print("Error receiving data from server:", e)
+    # with lock:
+    while True:
+        try:
+            data = sock.recv(65536)
+            updated_client_details = json.loads(data.decode())
+        
+            if(updated_client_details["identifier"]=="broadcast_message"):
+                print("Received updated client details \n")
+                client_details = updated_client_details["data"]
+            elif(updated_client_details["identifier"]=="Disconnection"):
+                print("Disconnected from server\n")
                 break
+            elif(updated_client_details["identifier"]=="AFK"):
+                name = updated_client_details["name"]
+                client_details = updated_client_details["data"]
+                print(f"{name} Left the chat\n")
+                print("Received updated client details \n")
+            elif(updated_client_details["identifier"]=="Communication"):
+                encrypt_message_r = updated_client_details["encrypt_message"]
+                try:
+                    decrpyted_message = decrypt_string(encrypt_message_r, private_key)
+                    print("Message received from:",updated_client_details["from"])
+                    print("Message", decrpyted_message)
+                except:
+                    print("Message not for us!\n")
+        except Exception as e:
+            print("Error receiving data from server:", e)
+            break
         
         
 # Create a TCP/IP socket
@@ -67,23 +76,34 @@ try:
         
         if(choice == 1):
             print("Here are the names")
-            with lock:
-                print(client_details.keys())
-                name = input("Enter the client you want to talk to: \n")
-                if(name in list(client_details.keys())):
-                    # taking the client details you want to connect to
-                    pk = client_details[name]
-                    
-                    message = input("Enter the message you want to send to the client\n")
-                    encrypt_message = encrypt_string(message,public_key)
-                    
-                else:
-                    print("Incorrect Name Please enter again\n")
+            # with lock:
+            print(client_details.keys())
+            name = input("Enter the client you want to talk to: \n")
+            if(name in list(client_details.keys())):
+                # taking the client details you want to connect to
+                pk = client_details[name]
+                
+                message = input("Enter the message you want to send to the client\n")
+                encrypt_message = encrypt_string(message,public_key)
+                print(encrypt_message)
+                data = {
+                    "identifier" : "Communication",
+                    "encrypt_message" : encrypt_message,
+                    "from": client_name
+                }
+                data_json = json.dumps(data)
+                sock.sendall(data_json.encode())
+            else:
+                print("Incorrect Name Please enter again\n")
         if(choice == 2):
             pass
     # choice = int(input("Enter 3 to quit"))
         if(choice == 3):
-            sock.sendall("QUIT".encode())
+            data = {
+                "identifier":"QUIT"
+            }
+            data_json = json.dumps(data)
+            sock.sendall(data_json.encode())
             receive_thread.join()
             sock.close()
             break
