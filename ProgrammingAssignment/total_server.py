@@ -1,3 +1,5 @@
+# server handling everything
+
 import socket
 import sys
 import json
@@ -5,6 +7,7 @@ import threading
 import cv2
 import pickle
 import struct
+import base64
 
 # Video file definitions (replace with your paths)
 video_files = {
@@ -63,7 +66,7 @@ def broadcast_dictionary(*args):
         except:
             remove_client(client_socket)
 
-def stream_video(connection, message_json):
+def stream_video(connection, choice):
     video_captures = {}
 
     for resolution, path in video_files.items():
@@ -87,13 +90,30 @@ def stream_video(connection, message_json):
         vid.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
 
         for _ in range(start_frame, end_frame):
+            
             ret, frame = vid.read()
             if not ret:
+                print("Hola")
                 break  # Handle end of video for this resolution
-
+            
             frame_data = pickle.dumps(frame)
             msg_size = struct.pack("Q", len(frame_data))
-            connection.sendall(msg_size + frame_data)
+            payload = msg_size + frame_data
+            print("Hi")
+
+            # Create JSON packet with identifier "Video Frame" and frame data
+            packet = {
+                "identifier": "Video Frame",
+                "data": payload
+            }
+            ERROR IS HERE, CANNOT HAVE PAYLOAD IN json
+            
+            json_packet = json.dumps(packet)
+            
+
+            # Send JSON packet to client
+            connection.sendall(json_packet.encode())
+            print("sENT JSON")
 
     # Cleanup
     for capture in video_captures.values():
@@ -145,6 +165,7 @@ def handle_client_connection(connection, client_address):
         while True:
             message = connection.recv(4096).decode()
             message_json = json.loads(message)
+            
             if(message_json["identifier"]=="QUIT"):
                 # move this into the broadcast function
                 message = {
@@ -158,9 +179,9 @@ def handle_client_connection(connection, client_address):
                 print("Incoming message from: ",message_json["from"])
                 broadcast_dictionary(message_json["encrypt_message"],message_json["from"])
             
-            if(message_json["identifier"]=="Video"):
-                print("Streaming Video for ")
-                stream_video(connection, message_json)
+            # if(message_json["identifier"]=="Video"):
+            #     print("Streaming Video for ")
+            #     stream_video(connection, message_json)
             
             if(message_json["identifier"]=="Video List"):
                 message = {
@@ -173,12 +194,7 @@ def handle_client_connection(connection, client_address):
                 choice = message_json["choice"]
                 client_name = message_json["from"]
                 print(f"Playing {video_list[choice]} for {client_name}")
-                message = {
-                    "identifier" : "Video Choice",
-                    "aknowledgement" : "Ok"
-                }
-                connection.sendall(json.dumps(message).encode())
-                stream_video(connection, message_json, message_json["choice"])
+                stream_video(connection, message_json["choice"])
             
 
     except KeyboardInterrupt:
