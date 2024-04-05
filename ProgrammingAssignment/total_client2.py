@@ -18,14 +18,9 @@ lock = threading.Lock()
 
 MESSAGE_TYPE_JSON = 1
 MESSAGE_TYPE_FRAME = 2
+global buffer
 buffer = []
 
-# def is_json(data):
-#     try:
-#         json.loads(data)
-#         return True
-#     except json.JSONDecodeError:
-#         return False
     
 def pack_message(message_type, message_data):
      # Construct the message with header
@@ -122,20 +117,24 @@ def receive_updates_from_server(sock):
                                     frame = cv2.resize(frame, (1280, 720))
 
                                     # Display frame
-                                    # cv2.imshow('Video Stream', frame) # Not working on Mac
+                                    cv2.imshow('Video Stream', frame) # Not working on Mac
                                     
                                     if cv2.waitKey(1) & 0xFF == ord('q'):
                                         break
-                                else:
+                                elif(message_type==MESSAGE_TYPE_JSON):
                                     json_data = client_socket.recv(message_size).decode()
+                                    # error for last byte occurs here
                                     message = json.loads(json_data)
                                     buffer.append(message)
-                            except:
-                                print("nothing received")
+                            except struct.error:
+                                # meaining last byte sent
+                                break
+                            except Exception as e:
+                                print("Other error", e)
                                 break
                         cv2.destroyAllWindows()
                         print("Stream finished")
-            except:
+            except struct:
                 pass
         except Exception as e:
             print("Error receiving data from server:", e)
