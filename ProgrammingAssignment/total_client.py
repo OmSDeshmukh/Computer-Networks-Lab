@@ -4,19 +4,24 @@ import sys
 import random
 import json
 import threading
+import base64
+import cv2
+import numpy as np
+
 from key_generation import generate_rsa_key_pair
 from key_generation import encrypt_string
 from key_generation import decrypt_string
-import time
-import base64
-import struct
-import pickle
-import cv2
-
 
 global client_details
 client_details = dict()
 lock = threading.Lock()
+
+def is_json(data):
+    try:
+        json.loads(data)
+        return True
+    except json.JSONDecodeError:
+        return False
     
 def receive_updates_from_server(sock):
     global client_details
@@ -55,21 +60,54 @@ def receive_updates_from_server(sock):
             elif(updated_client_details["identifier"]=="Video List"):
                 video_list = updated_client_details["data"]
                 print("Availaible Videos")
-                for v in video_list:
-                    print(v)
+                for video in video_list:
+                    for quality in video:
+                        print(quality)
+                    print("")
                     
             elif(updated_client_details["identifier"]=="Video Frame"):
-                print("Aknowledged")
-                payload_size = struct.unpack("Q", updated_client_details["data"][:8])[0]  # Unpack message size
-                frame_data = updated_client_details["data"][8:]  # Extract frame data after size
+                print("Video Streaming mode")
+                client_socket = sock
+                while True:
+                    # For each of the frame
+                    
+                    # Receive frame size
+                    frame_size_data = client_socket.recv(16)
+                    if not frame_size_data:
+                        break
+                    
+                    # handle case when final frame is sent
+                    # type error occurs here
+                    frame_size = int(frame_size_data.strip())
+                    if frame_size == 0:
+                        break
 
-                # Extract frame from frame data
-                frame = pickle.loads(frame_data)
-                frame = cv2.resize(frame, (1080, 720))
-                cv2.imshow("RECEIVING VIDEO", frame)
-                print("frame received")
+                    # Receive frame data
+                    frame_data = b''
+                    while len(frame_data) < frame_size:
+                        remaining_bytes = frame_size - len(frame_data)
+                        data_recv = client_socket.recv(remaining_bytes)
+                        frame_data += data_recv
+                            
 
-                # cv2.waitKey(1)
+                    # Convert frame data to numpy array
+                    frame_np = np.frombuffer(frame_data, dtype=np.uint8)
+
+                    # Decode frame
+                    frame = cv2.imdecode(frame_np, cv2.IMREAD_COLOR)
+
+                    # Resize frame to 1280x720
+                    frame = cv2.resize(frame, (1280, 720))
+
+                    # Display frame
+                    # cv2.imshow('Video Stream', frame) # Not working on Mac
+                    
+                    if cv2.waitKey(1) & 0xFF == ord('q'):
+                        break
+
+                cv2.destroyAllWindows()
+                print("Stream finished")
+                
         except Exception as e:
             print("Error receiving data from server:", e)
             break
@@ -134,7 +172,7 @@ try:
             data_json = json.dumps(data)
             sock.sendall(data_json.encode())
             
-            choice = int(input("Enter the serial number for you choice"))
+            choice = input("Enter video name (as Video1_240p):")
             data = {
                 "identifier" : "Video Choice",
                 "choice" : choice,

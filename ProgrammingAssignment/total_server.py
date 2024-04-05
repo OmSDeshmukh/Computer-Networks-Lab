@@ -1,23 +1,18 @@
 # server handling everything
-
 import socket
 import sys
 import json
 import threading
 import cv2
-import pickle
-import struct
-import base64
 
-# Video file definitions (replace with your paths)
-video_files = {
-    "240p": "videos/Video1_240p.mp4",
-    "720p": "videos/Video1_720p.mp4",
-    "1080p": "videos/Video1_1080p.mp4"
-}
+video_files = [["videos/Video1_240p.mp4", "videos/Video1_720p.mp4", "videos/Video1_1080p.mp4"],
+               ["videos/Video2_240p.mp4", "videos/Video2_720p.mp4", "videos/Video2_1080p.mp4"],
+               ["videos/Video3_240p.mp4", "videos/Video3_720p.mp4", "videos/Video3_1080p.mp4"]]
 
 # List of videos
-video_list = ["Video1_240p.mp4", "Video1_720p.mp4", "Video1_1080p.mp4"]
+video_list = [["Video1_240p.mp4", "Video1_720p.mp4", "Video1_1080p.mp4"],
+              ["Video2_240p.mp4", "Video2_720p.mp4", "Video2_1080p.mp4"],
+              ["Video3_240p.mp4", "Video3_720p.mp4", "Video3_1080p.mp4"]]
 
 # Create a TCP/IP socket
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -34,7 +29,6 @@ sock.listen(5)
 global client_details
 client_details = dict() # name : public key
 lock = threading.Lock()
-# clients = []  # List to store connected client sockets
 client_socks = dict() # to store the socket : public key mapping
 
 # best to calculate all the messages outside this function and use this only for braodcasting
@@ -67,57 +61,43 @@ def broadcast_dictionary(*args):
             remove_client(client_socket)
 
 def stream_video(connection, choice):
-    video_captures = {}
-
-    for resolution, path in video_files.items():
-        video_captures[resolution] = cv2.VideoCapture(path)
-
-    total_frames = min(vid.get(cv2.CAP_PROP_FRAME_COUNT) for vid in video_captures.values())
-    target_frames_per_resolution = int(total_frames // len(video_files))
-    
-    # Define frame ranges for each resolution
-    frame_ranges = {
-        "240p": (0, target_frames_per_resolution),
-        "720p": (target_frames_per_resolution, 2*target_frames_per_resolution),
-        "1080p": (2* target_frames_per_resolution, 3*target_frames_per_resolution)
-    }
-
-    # Video streaming loop
-    for resolution, frame_range in frame_ranges.items():
-        start_frame, end_frame = frame_range
-
-        vid = video_captures[resolution]
-        vid.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
-
-        for _ in range(start_frame, end_frame):
-            
-            ret, frame = vid.read()
+    videos = video_files[choice-1]
+    frame_counts = [0] * len(videos)
+    current_file_index = 0
+    while current_file_index < len(videos):
+        cap = cv2.VideoCapture(videos[current_file_index])
+        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        start_frame = (total_frames // 3)*current_file_index
+        end_frame = (total_frames // 3) * (current_file_index+1)
+        
+        print("file_name: ",videos[current_file_index])
+        print("start_frame: ", start_frame, " end_frame: ", end_frame, "total_frames: ", total_frames)
+        
+        # for each frame
+        cap.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
+        while cap.isOpened():
+            ret, frame = cap.read()
             if not ret:
-                print("Hola")
-                break  # Handle end of video for this resolution
-            
-            frame_data = pickle.dumps(frame)
-            msg_size = struct.pack("Q", len(frame_data))
-            payload = msg_size + frame_data
-            print("Hi")
+                break
+            current_frame = int(cap.get(cv2.CAP_PROP_POS_FRAMES))
 
-            # Create JSON packet with identifier "Video Frame" and frame data
-            packet = {
-                "identifier": "Video Frame",
-                "data": payload
-            }
-            ERROR IS HERE, CANNOT HAVE PAYLOAD IN json
+            # Serialize frame
+            frame_data = cv2.imencode('.jpg', frame)[1].tobytes()
             
-            json_packet = json.dumps(packet)
+            # Send frame size and data
+            connection.sendall((str(len(frame_data))).encode().ljust(16) + frame_data)
             
+            # print("Frame sent")
+            # Switch to the next file if one-third of frames sent
+            if  current_frame >= end_frame:
+                current_file_index += 1
+                break
+        
+        cap.release()
+    print("Finished")
 
-            # Send JSON packet to client
-            connection.sendall(json_packet.encode())
-            print("sENT JSON")
-
-    # Cleanup
-    for capture in video_captures.values():
-        capture.release()
+    # to aknowledge that streaming has finished
+    connection.sendall('0'.encode().ljust(16))
 
 def remove_client(client_socket):
     global client_details, client_socks
@@ -138,14 +118,11 @@ def remove_client(client_socket):
 def handle_client_connection(connection, client_address):
     global client_details, client_socks
     try:
-        # while True:
         # welcome_string1 = "Enter your name: "
-        # connection.sendall(welcome_string1.encode())
         name_received = connection.recv(1024).decode()
         print("Name received:", name_received)
         
         # welcome_string2 = "Enter the public key: "
-        # connection.sendall(welcome_string2.encode())
         public_key_received = connection.recv(4096).decode()
         print("Public Key received:", public_key_received)
         
@@ -156,7 +133,6 @@ def handle_client_connection(connection, client_address):
             
         print("Current Client Details:", client_details)
         
-        # Sending the updated dictionary to the client 
         # Updating every client
         with lock:
             broadcast_dictionary()
@@ -179,10 +155,6 @@ def handle_client_connection(connection, client_address):
                 print("Incoming message from: ",message_json["from"])
                 broadcast_dictionary(message_json["encrypt_message"],message_json["from"])
             
-            # if(message_json["identifier"]=="Video"):
-            #     print("Streaming Video for ")
-            #     stream_video(connection, message_json)
-            
             if(message_json["identifier"]=="Video List"):
                 message = {
                     "identifier" : "Video List",
@@ -191,10 +163,17 @@ def handle_client_connection(connection, client_address):
                 connection.sendall(json.dumps(message).encode())
             
             if(message_json["identifier"]=="Video Choice"):
+                message = {
+                    "identifier" : "Video Frame",
+                }
+                connection.sendall(json.dumps(message).encode())
+                
                 choice = message_json["choice"]
+                choice_no = int(choice[5])
+                # choice_quality = choice.substr(7)
                 client_name = message_json["from"]
-                print(f"Playing {video_list[choice]} for {client_name}")
-                stream_video(connection, message_json["choice"])
+                print(f"Playing {choice} for {client_name}")
+                stream_video(connection, choice=choice_no)
             
 
     except KeyboardInterrupt:
