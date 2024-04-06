@@ -5,19 +5,27 @@ import json
 import threading
 import cv2
 import struct
+import os
 
 # Define message types
 MESSAGE_TYPE_JSON = 1
 MESSAGE_TYPE_FRAME = 2
 
-video_files = [["videos/Video1_240p.mp4", "videos/Video1_720p.mp4", "videos/Video1_1080p.mp4"],
-               ["videos/Video2_240p.mp4", "videos/Video2_720p.mp4", "videos/Video2_1080p.mp4"],
-               ["videos/Video3_240p.mp4", "videos/Video3_720p.mp4", "videos/Video3_1080p.mp4"]]
+VIDEO_DIR = "videos/"
 
-# List of videos
-video_list = [["Video1_240p.mp4", "Video1_720p.mp4", "Video1_1080p.mp4"],
-              ["Video2_240p.mp4", "Video2_720p.mp4", "Video2_1080p.mp4"],
-              ["Video3_240p.mp4", "Video3_720p.mp4", "Video3_1080p.mp4"]]
+nfiles = 0
+for f in os.listdir(VIDEO_DIR):
+    if(f.endswith('mp4')):
+        nfiles+=1
+  
+video_list = [[] for i in range(nfiles//3)]
+video_files = [[] for i in range(nfiles//3)]  
+
+for f in os.listdir(VIDEO_DIR):
+    if(f.endswith('mp4')):
+        i = int(f[5])
+        video_files[i-1].append(VIDEO_DIR + f)
+        video_list[i-1].append(f)
 
 # Create a TCP/IP socket
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -73,7 +81,6 @@ def broadcast_dictionary(*args):
     upupdated_client_details_message = pack_message(MESSAGE_TYPE_JSON,updated_client_details_json)
     for client_socket in list(client_socks.keys()):
         try:
-            # broadcast only to the other clients HANDLE ITTTTTT
             client_socket.sendall(upupdated_client_details_message)
         except:
             remove_client(client_socket)
@@ -113,10 +120,16 @@ def stream_video(connection, choice):
                 break
         
         cap.release()
-    print("Finished")
+    print("Stream Finished")
 
     # to aknowledge that streaming has finished
-    connection.sendall('0'.encode().ljust(16))
+    # connection.sendall('0'.encode().ljust(16))
+    message = {
+        "identifier": "Video Finish"  # Use a suitable identifier value
+    }
+    message_json = json.dumps(message)
+    message = pack_message(MESSAGE_TYPE_JSON,message_json)
+    connection.sendall(message)
 
 def remove_client(client_socket):
     global client_details, client_socks
@@ -164,8 +177,6 @@ def handle_client_connection(connection, client_address):
                 if(message_type == MESSAGE_TYPE_JSON):
                     json_data = connection.recv(message_size).decode()
                     message_json = json.loads(json_data)
-                    # message = connection.recv(4096).decode()
-                    # message_json = json.loads(message)
                     
                     if(message_json["identifier"]=="QUIT"):
                         # move this into the broadcast function
@@ -207,6 +218,9 @@ def handle_client_connection(connection, client_address):
                         client_name = message_json["from"]
                         print(f"Playing {choice} for {client_name}")
                         stream_video(connection, choice=choice_no)
+            except ConnectionResetError:
+                remove_client(client_socket=connection)
+                break
             except:
                 pass
 

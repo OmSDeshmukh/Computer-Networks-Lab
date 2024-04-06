@@ -8,9 +8,69 @@ import base64
 import cv2
 import numpy as np
 import struct
-from key_generation import generate_rsa_key_pair
-from key_generation import encrypt_string
-from key_generation import decrypt_string
+# from key_generation import generate_rsa_key_pair
+# from key_generation import encrypt_string
+# from key_generation import decrypt_string
+
+from cryptography.hazmat.primitives.asymmetric import rsa, padding
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import utils
+from cryptography.hazmat.primitives import hashes
+
+
+# Generate RSA key pair
+def generate_rsa_key_pair():
+    private_key = rsa.generate_private_key(
+        public_exponent=65537,
+        key_size=2048,
+    )
+    public_key = private_key.public_key()
+
+    # Serialize private key
+    private_pem = private_key.private_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.PKCS8,
+        encryption_algorithm=serialization.NoEncryption()
+    )
+
+    # Serialize public key
+    public_pem = public_key.public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo
+    )
+
+    return private_pem, public_pem
+
+# Encrypt a string using RSA public key
+def encrypt_string(message, public_key):
+    public_key = public_key.encode() #since the dictionary stores a decoded version of the public key
+    public_key_obj = serialization.load_pem_public_key(public_key)
+    ciphertext = public_key_obj.encrypt(
+        message.encode(),
+        padding.OAEP(
+            mgf=padding.MGF1(algorithm=hashes.SHA256()),
+            algorithm=hashes.SHA256(),
+            label=None
+        )
+    )
+    return ciphertext
+
+# Decrypt RSA encrypted data using private key
+def decrypt_string(ciphertext, private_key):
+    private_key_obj = serialization.load_pem_private_key(
+        private_key,
+        password=None
+    )
+    plaintext = private_key_obj.decrypt(
+        ciphertext,
+        padding.OAEP(
+            mgf=padding.MGF1(algorithm=hashes.SHA256()),
+            algorithm=hashes.SHA256(),
+            label=None
+        )
+    )
+    return plaintext.decode()
+
 
 global client_details
 client_details = dict()
@@ -20,7 +80,6 @@ MESSAGE_TYPE_JSON = 1
 MESSAGE_TYPE_FRAME = 2
 global buffer
 buffer = []
-
     
 def pack_message(message_type, message_data):
      # Construct the message with header
@@ -32,6 +91,142 @@ def pack_message(message_type, message_data):
         message = header + message_data.encode()
     return message
 
+
+def break_connection(sock):
+    print("Disconnected from server")
+    print("Closing socket")
+    sock.close()
+    exit()
+    
+    
+def update_client_details(updated_client_details):
+    global client_details
+    print("Received updated client details")
+    client_details = updated_client_details.get("data")
+    
+    
+def handle_afk(updated_client_details):
+    name = updated_client_details.get("name")
+    update_client_details(updated_client_details)
+    print(f"{name} Left the chat")
+
+
+def handle_communication(updated_client_details):
+    encrypt_message_base64_r = updated_client_details.get("encrypt_message")
+    encrypt_message_r = base64.b64decode(encrypt_message_base64_r)
+    try:
+        decrypted_message = decrypt_string(encrypt_message_r, private_key)
+        print("Message received from: ", updated_client_details.get("from"))
+        print("Message: ", decrypted_message)
+    except:
+        # print("Message not for us!")
+        pass
+    
+    
+def handle_video_list(updated_details):
+    video_list = updated_details.get("data")
+    print("Available Videos")
+    for video in video_list:
+        for quality in video:
+            print(quality)
+        print("")
+        
+        
+def handle_video_frame(sock):
+    client_socket = sock
+    while True:
+        # For each of the frame
+        header = client_socket.recv(5)
+        try:
+            message_type, message_size = struct.unpack("!BI", header)
+            # Receive frame size
+            if(message_type == MESSAGE_TYPE_FRAME):
+                frame_size_data = client_socket.recv(16)
+                
+                frame_size = int(frame_size_data.strip())
+
+                # Receive frame data
+                frame_data = b''
+                while len(frame_data) < frame_size:
+                    remaining_bytes = frame_size - len(frame_data)
+                    data_recv = client_socket.recv(remaining_bytes)
+                    frame_data += data_recv
+                        
+                # Convert frame data to numpy array
+                frame_np = np.frombuffer(frame_data, dtype=np.uint8)
+
+                # Decode frame
+                frame = cv2.imdecode(frame_np, cv2.IMREAD_COLOR)
+
+                # Resize frame to 1280x720
+                frame = cv2.resize(frame, (1280, 720))
+
+                # Display frame
+                # cv2.imshow('Video Stream', frame) # Not working on Mac
+                
+                if cv2.waitKey(1) & 0xFF == ord('q'):
+                    break
+                
+            elif(message_type==MESSAGE_TYPE_JSON):
+                json_data = client_socket.recv(message_size).decode()
+                message = json.loads(json_data)
+                
+                if(message["identifier"]=="Video Finish"):
+                    print("Stream finished")
+                    break
+                else:
+                    buffer.append(message)
+        except struct.error:
+            # meaining last byte sent
+            print("struct error")
+            break
+        except Exception as e:
+            print("Error", e)
+            break
+    cv2.destroyAllWindows()
+
+
+def handle_json_message(sock, message_size):
+    json_data = sock.recv(message_size).decode()
+    updated_client_details = json.loads(json_data)
+    identifier = updated_client_details.get("identifier")
+
+    if identifier == "broadcast_message":
+        update_client_details(updated_client_details)
+    elif identifier == "Disconnection":
+        break_connection(sock=sock)
+    elif identifier == "AFK":
+        handle_afk(updated_client_details)
+    elif identifier == "Communication":
+        handle_communication(updated_client_details)
+    elif identifier == "Video List":
+        handle_video_list(updated_client_details)
+    elif identifier == "Video Frame":
+        print("Video Streaming Mode")
+        handle_video_frame(sock)
+        if(len(buffer)!=0):
+            print("Handling buffer")
+            handle_buffer(sock)
+        
+    
+def handle_buffer(sock):
+    global buffer
+    for updated_client_details in buffer:
+        identifier = updated_client_details["identifier"]
+        
+        if identifier == "broadcast_message":
+            update_client_details(updated_client_details)
+        elif identifier == "Disconnection":
+            break_connection(sock)
+        elif identifier == "AFK":
+            handle_afk(updated_client_details)
+        elif identifier == "Communication":
+            handle_communication(updated_client_details)
+        elif identifier == "Video List":
+            handle_video_list(updated_client_details)
+    
+    buffer = []
+
 def receive_updates_from_server(sock):
     global client_details
     # with lock:
@@ -41,100 +236,11 @@ def receive_updates_from_server(sock):
             try:
                 message_type, message_size = struct.unpack("!BI", header)
                 if(message_type==MESSAGE_TYPE_JSON):
-                    json_data = sock.recv(message_size).decode()
-                    updated_client_details = json.loads(json_data)
-                    # updated_client_details = json.loads(data.decode())
-                
-                    if(updated_client_details["identifier"]=="broadcast_message"):
-                        print("Received updated client details \n")
-                        # with lock: #gimini
-                        client_details = updated_client_details["data"]
-                        
-                    elif(updated_client_details["identifier"]=="Disconnection"):
-                        print("Disconnected from server\n")
-                        break
-                    
-                    elif(updated_client_details["identifier"]=="AFK"):
-                        name = updated_client_details["name"]
-                        # with lock:
-                        client_details = updated_client_details["data"]
-                        print(f"{name} Left the chat\n")
-                        print("Received updated client details \n")
-                        
-                    elif(updated_client_details["identifier"]=="Communication"):
-                        encrypt_message_base64_r = updated_client_details["encrypt_message"]
-                        encrypt_message_r = base64.b64decode(encrypt_message_base64_r)
-                        try:
-                            decrpyted_message = decrypt_string(encrypt_message_r, private_key)
-                            print("Message received from: ",updated_client_details["from"])
-                            print("Message: ", decrpyted_message)
-                        except:
-                            print("Message not for us!\n")
-                    
-                    elif(updated_client_details["identifier"]=="Video List"):
-                        video_list = updated_client_details["data"]
-                        print("Availaible Videos")
-                        for video in video_list:
-                            for quality in video:
-                                print(quality)
-                            print("")
-                    
-                    elif(updated_client_details["identifier"]=="Video Frame"):
-                        print("Video Streaming mode")
-                        client_socket = sock
-                        while True:
-                            # For each of the frame
-                            header = client_socket.recv(5)
-                            try:
-                                message_type, message_size = struct.unpack("!BI", header)
-                                # Receive frame size
-                                if(message_type == MESSAGE_TYPE_FRAME):
-                                    frame_size_data = client_socket.recv(16)
-                                    if not frame_size_data:
-                                        break
-                                    
-                                    # handle case when final frame is sent
-                                    # type error occurs here
-                                    frame_size = int(frame_size_data.strip())
-                                    if frame_size == 0:
-                                        break
-
-                                    # Receive frame data
-                                    frame_data = b''
-                                    while len(frame_data) < frame_size:
-                                        remaining_bytes = frame_size - len(frame_data)
-                                        data_recv = client_socket.recv(remaining_bytes)
-                                        frame_data += data_recv
-                                            
-
-                                    # Convert frame data to numpy array
-                                    frame_np = np.frombuffer(frame_data, dtype=np.uint8)
-
-                                    # Decode frame
-                                    frame = cv2.imdecode(frame_np, cv2.IMREAD_COLOR)
-
-                                    # Resize frame to 1280x720
-                                    frame = cv2.resize(frame, (1280, 720))
-
-                                    # Display frame
-                                    # cv2.imshow('Video Stream', frame) # Not working on Mac
-                                    
-                                    if cv2.waitKey(1) & 0xFF == ord('q'):
-                                        break
-                                elif(message_type==MESSAGE_TYPE_JSON):
-                                    json_data = client_socket.recv(message_size).decode()
-                                    # error for last byte occurs here
-                                    message = json.loads(json_data)
-                                    buffer.append(message)
-                            except struct.error:
-                                # meaining last byte sent
-                                break
-                            except Exception as e:
-                                print("Other error", e)
-                                break
-                        cv2.destroyAllWindows()
-                        print("Stream finished")
+                    handle_json_message(sock=sock,message_size=message_size)
+                elif(message_type==MESSAGE_TYPE_FRAME):
+                    handle_video_frame(sock=sock)
             except struct.error:
+                print("Struct error 2")
                 pass
         except Exception as e:
             print("Error receiving data from server:", e)
@@ -174,7 +280,7 @@ try:
         if(choice == 1):
             print("Here are the names")
             # with lock:
-            print(client_details.keys())
+            print(list(client_details.keys()))
             name = input("Enter the client you want to talk to: \n")
             if(name in list(client_details.keys())):
                 # taking the client details you want to connect to
@@ -223,12 +329,8 @@ try:
             receive_thread.join()
             sock.close()
             break
-
-    # Wait for threads to complete
-    # send_thread.join()
-    # receive_thread.join()
+        
 except Exception as e:
     print("Error:", e)
-finally:
     print('Closing socket')
     sock.close()
