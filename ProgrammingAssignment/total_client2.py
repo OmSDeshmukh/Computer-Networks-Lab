@@ -117,7 +117,7 @@ def receive_updates_from_server(sock):
                                     frame = cv2.resize(frame, (1280, 720))
 
                                     # Display frame
-                                    cv2.imshow('Video Stream', frame) # Not working on Mac
+                                    # cv2.imshow('Video Stream', frame) # Not working on Mac
                                     
                                     if cv2.waitKey(1) & 0xFF == ord('q'):
                                         break
@@ -134,7 +134,7 @@ def receive_updates_from_server(sock):
                                 break
                         cv2.destroyAllWindows()
                         print("Stream finished")
-            except struct:
+            except struct.error:
                 pass
         except Exception as e:
             print("Error receiving data from server:", e)
