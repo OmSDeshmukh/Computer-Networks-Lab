@@ -1,7 +1,4 @@
-# client with everything handled
 import socket
-import sys
-import random
 import json
 import threading
 import base64
@@ -13,7 +10,16 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import utils
 from cryptography.hazmat.primitives import hashes
 
+
 global client_name
+global client_details
+client_details = dict()
+lock = threading.Lock()
+
+MESSAGE_TYPE_JSON = 1
+MESSAGE_TYPE_FRAME = 2
+global buffer
+buffer = []
 
 # Generate RSA key pair
 def generate_rsa_key_pair():
@@ -67,16 +73,6 @@ def decrypt_string(ciphertext, private_key):
         )
     )
     return plaintext.decode()
-
-
-global client_details
-client_details = dict()
-lock = threading.Lock()
-
-MESSAGE_TYPE_JSON = 1
-MESSAGE_TYPE_FRAME = 2
-global buffer
-buffer = []
     
 # function to pack messages with their identifier
 def pack_message(message_type, message_data):
@@ -252,98 +248,99 @@ def receive_updates_from_server(sock):
             break
         
         
-# Create a TCP/IP socket
-sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+if __name__ == "__main__":
+    # Create a TCP/IP socket
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-# Connect the socket to the port where the server is listening
-server_address = ('localhost', 10000)
-print(f"Connecting to {server_address[0]} port {server_address[1]}")
-sock.connect(server_address)
+    # Connect the socket to the port where the server is listening
+    server_address = ('localhost', 10000)
+    print(f"Connecting to {server_address[0]} port {server_address[1]}")
+    sock.connect(server_address)
 
-# Start a thread to receive updates from the server
-receive_thread = threading.Thread(target=receive_updates_from_server, args=(sock,))
+    # Start a thread to receive updates from the server
+    receive_thread = threading.Thread(target=receive_updates_from_server, args=(sock,))
 
-try:
-    # Send the client's name
-    welcome_string1 = sock.recv(1024).decode()
-    if(welcome_string1 == "Enter your name: "):
-        client_name = input("Enter your name: ")
-        sock.sendall(client_name.encode())
-        print("Name sent")
-    
-    # Generate public and private keys for the client
-    private_key, public_key = generate_rsa_key_pair()
-    
-    # Send the public key to the server
-    welcome_string2 = sock.recv(4096).decode()
-    if(welcome_string2 == "Enter the public key: "):
-        sock.sendall(public_key)
-        print("Public key sent")
-    
-    # start the thread to receive messages from server
-    receive_thread.start()
-    
-    while True:
-        # Printing Choices
-        choice = int(input("Enter \n 1 to Talk to client \n 2 to Stream Video \n 3 to QUIT \n"))
+    try:
+        # Send the client's name
+        welcome_string1 = sock.recv(1024).decode()
+        if(welcome_string1 == "Enter your name: "):
+            client_name = input("Enter your name: ")
+            sock.sendall(client_name.encode())
+            print("Name sent")
         
-        # when client wants to communicate with another client
-        if(choice == 1):
-            print("Here are the names")
-            # with lock:
-            print(list(client_details.keys()))
-            name = input("Enter the client you want to talk to: \n")
-            if(name in list(client_details.keys())):
-                # taking the client details you want to connect to
-                pk = client_details[name]
+        # Generate public and private keys for the client
+        private_key, public_key = generate_rsa_key_pair()
+        
+        # Send the public key to the server
+        welcome_string2 = sock.recv(4096).decode()
+        if(welcome_string2 == "Enter the public key: "):
+            sock.sendall(public_key)
+            print("Public key sent")
+        
+        # start the thread to receive messages from server
+        receive_thread.start()
+        
+        while True:
+            # Printing Choices
+            choice = int(input("Enter \n 1 to Talk to client \n 2 to Stream Video \n 3 to QUIT \n"))
+            
+            # when client wants to communicate with another client
+            if(choice == 1):
+                print("Here are the names")
+                # with lock:
+                print(list(client_details.keys()))
+                name = input("Enter the client you want to talk to: \n")
+                if(name in list(client_details.keys())):
+                    # taking the client details you want to connect to
+                    pk = client_details[name]
+                    
+                    message = input("Enter the message you want to send to the client\n")
+                    encrypt_message = encrypt_string(message,pk)
+                    encrypt_message_base64 = base64.b64encode(encrypt_message).decode()
+                    data = {
+                        "identifier" : "Communication",
+                        "encrypt_message" : encrypt_message_base64,
+                        "from": client_name
+                    }
+                    data_json = json.dumps(data)
+                    message = pack_message(MESSAGE_TYPE_JSON,data_json)
+                    sock.sendall(message)
+                else:
+                    print("Incorrect Name Please enter again\n")
                 
-                message = input("Enter the message you want to send to the client\n")
-                encrypt_message = encrypt_string(message,pk)
-                encrypt_message_base64 = base64.b64encode(encrypt_message).decode()
+            # When client wants video choices 
+            if(choice == 2):
                 data = {
-                    "identifier" : "Communication",
-                    "encrypt_message" : encrypt_message_base64,
-                    "from": client_name
+                    "identifier" : "Video List",
                 }
                 data_json = json.dumps(data)
                 message = pack_message(MESSAGE_TYPE_JSON,data_json)
                 sock.sendall(message)
-            else:
-                print("Incorrect Name Please enter again\n")
+                
+                choice = input("Enter video name (as Video1_240p.mp4):")
+                data = {
+                    "identifier" : "Video Choice",
+                    "choice" : choice,
+                    "from" : client_name
+                }
+                data_json = json.dumps(data)
+                message = pack_message(MESSAGE_TYPE_JSON,data_json)
+                sock.sendall(message)
+                print("Choice Sent")
+                
+            # when client wants to quit
+            if(choice == 3):
+                data = {
+                    "identifier":"QUIT"
+                }
+                data_json = json.dumps(data)
+                message = pack_message(MESSAGE_TYPE_JSON,data_json)
+                sock.sendall(message)
+                receive_thread.join()
+                sock.close()
+                break
             
-        # When client wants video choices 
-        if(choice == 2):
-            data = {
-                "identifier" : "Video List",
-            }
-            data_json = json.dumps(data)
-            message = pack_message(MESSAGE_TYPE_JSON,data_json)
-            sock.sendall(message)
-            
-            choice = input("Enter video name (as Video1_240p.mp4):")
-            data = {
-                "identifier" : "Video Choice",
-                "choice" : choice,
-                "from" : client_name
-            }
-            data_json = json.dumps(data)
-            message = pack_message(MESSAGE_TYPE_JSON,data_json)
-            sock.sendall(message)
-            print("Choice Sent")
-            
-        # when client wants to quit
-        if(choice == 3):
-            data = {
-                "identifier":"QUIT"
-            }
-            data_json = json.dumps(data)
-            message = pack_message(MESSAGE_TYPE_JSON,data_json)
-            sock.sendall(message)
-            receive_thread.join()
-            sock.close()
-            break
-        
-except Exception as e:
-    print("Error:", e)
-    print('Closing socket')
-    sock.close()
+    except Exception as e:
+        print("Error:", e)
+        print('Closing socket')
+        sock.close()

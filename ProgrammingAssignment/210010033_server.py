@@ -1,4 +1,3 @@
-# server handling everything
 import socket
 import sys
 import json
@@ -11,6 +10,11 @@ import os
 MESSAGE_TYPE_JSON = 1
 MESSAGE_TYPE_FRAME = 2
 
+global client_details
+client_details = dict() # name : public key mapping
+lock = threading.Lock()
+client_socks = dict() #  socket : public key mapping
+
 # This part is to handle the video file
 def list_video_files():
     VIDEO_DIR = "videos/"
@@ -20,26 +24,6 @@ def list_video_files():
         if(f.endswith('.mp4')):
             video_files.append(f)
     return video_files
-
-
-# Create a TCP/IP socket
-sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-sock.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1)
-
-
-# Bind the socket to the port
-server_address = ('localhost', 10000)
-print('Server starting up on %s port %s' % server_address)
-sock.bind(server_address)
-
-# put socket in listening mode for TCP connections
-sock.listen(5)
-
-global client_details
-client_details = dict() # name : public key
-lock = threading.Lock()
-client_socks = dict() # to store the socket : public key mapping
-
 
 # for packing message with its identifier
 def pack_message(message_type, message_data):
@@ -236,20 +220,34 @@ def handle_client_connection(connection, client_address):
     finally:
         connection.close()
 
-# main part of the code, the one accepting client connections
-try:
-    while True:
-        # Accept incoming connections
-        connection, client_address = sock.accept()
-        print(f"Connected to client {client_address}")
-        
-        # Add the client socket to the list of clients
-        client_socks[connection] = ""
-        
-        # Create a new thread to handle client connection
-        client_thread = threading.Thread(target=handle_client_connection, args=(connection, client_address))
-        client_thread.start()
-except KeyboardInterrupt:
-    print("Server interrupted. Closing.")
-finally:
-    sock.close()
+
+if __name__ == "__main__":
+    # Create a TCP/IP socket
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1)
+
+
+    # Bind the socket to the port
+    server_address = ('localhost', 10000)
+    print('Server starting up on %s port %s' % server_address)
+    sock.bind(server_address)
+
+    # put socket in listening mode for TCP connections
+    sock.listen(5)
+
+    try:
+        while True:
+            # Accept incoming connections
+            connection, client_address = sock.accept()
+            print(f"Connected to client {client_address}")
+            
+            # Add the client socket to the list of clients
+            client_socks[connection] = ""
+            
+            # Create a new thread to handle client connection
+            client_thread = threading.Thread(target=handle_client_connection, args=(connection, client_address))
+            client_thread.start()
+    except KeyboardInterrupt:
+        print("Server interrupted. Closing.")
+    finally:
+        sock.close()
