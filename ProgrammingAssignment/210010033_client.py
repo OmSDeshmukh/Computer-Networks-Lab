@@ -132,9 +132,8 @@ def handle_video_list(updated_details):
     video_list = updated_details.get("data")
     print("Available Videos")
     for video in video_list:
-        for quality in video:
-            print(quality)
-        print("")
+        print(video)
+    print("")
         
 # function to handle video streaming
 def handle_video_frame(sock):

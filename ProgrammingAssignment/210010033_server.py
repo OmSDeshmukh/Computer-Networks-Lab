@@ -11,22 +11,15 @@ import os
 MESSAGE_TYPE_JSON = 1
 MESSAGE_TYPE_FRAME = 2
 
-# This part is to handle the video files
-VIDEO_DIR = "videos/"
+# This part is to handle the video file
+def list_video_files():
+    VIDEO_DIR = "videos/"
+    video_files = []  
 
-nfiles = 0
-for f in os.listdir(VIDEO_DIR):
-    if(f.endswith('mp4')):
-        nfiles+=1
-  
-video_list = [[] for i in range(nfiles//3)]
-video_files = [[] for i in range(nfiles//3)]  
-
-for f in os.listdir(VIDEO_DIR):
-    if(f.endswith('mp4')):
-        i = int(f[5])
-        video_files[i-1].append(VIDEO_DIR + f)
-        video_list[i-1].append(f)
+    for f in os.listdir(VIDEO_DIR):
+        if(f.endswith('.mp4')):
+            video_files.append(f)
+    return video_files
 
 
 # Create a TCP/IP socket
@@ -74,8 +67,11 @@ def broadcast(message):
 
 # Function to stream video to a specific client connection
 def stream_video(connection, choice):
-    videos = video_files[choice-1]
-    frame_counts = [0] * len(videos)
+    videos = []
+    videos.append(f"videos/{choice}_240p.mp4")
+    videos.append(f"videos/{choice}_720p.mp4")
+    videos.append(f"videos/{choice}_1440p.mp4")
+    # frame_counts = [0] * len(videos)
     current_file_index = 0
     while current_file_index < len(videos):
         cap = cv2.VideoCapture(videos[current_file_index])
@@ -161,6 +157,7 @@ def handle_client_connection(connection, client_address):
             
         # print("Current Client Details:", client_details)
         
+        
         # Updating every client
         with lock:
             message = {
@@ -205,7 +202,7 @@ def handle_client_connection(connection, client_address):
                     if(message_json["identifier"]=="Video List"):
                         message = {
                             "identifier" : "Video List",
-                            "data" : video_list
+                            "data" : list_video_files()
                         }
                         message_json = json.dumps(message)
                         message = pack_message(MESSAGE_TYPE_JSON,message_json)
@@ -220,10 +217,10 @@ def handle_client_connection(connection, client_address):
                         message = pack_message(MESSAGE_TYPE_JSON,message_j)
                         connection.sendall(message)
                         choice = message_json["choice"]
-                        choice_no = int(choice[5])
+                        choice = choice.split('_')[0]
                         client_name = message_json["from"]
                         print(f"Playing {choice} for {client_name}")
-                        stream_video(connection, choice=choice_no)
+                        stream_video(connection, choice=choice)
             except ConnectionResetError:
                 remove_client(client_socket=connection)
                 break
