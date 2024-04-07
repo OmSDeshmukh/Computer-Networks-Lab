@@ -19,9 +19,17 @@ The `210010033_server.py` script handles incoming client connections, manages cl
 
 The `210010033_client.py` script allows clients to connect to the server, send encrypted messages, request video streams, and interact with the server. Here are its main functionalities:
 
+
 - **Connect to Server**: Connects to the server using the provided address and port.
-- **Secure Communication**: Utilizes RSA encryption to send and receive encrypted messages securely.
+- When the connection is made, the server sends its name and the public key to the server.
+- Once, name and public key is sent, we start the receiving thread which shall now be responsible for receiving messages from the server.
+- The main thread would be responsible for sending messages to the server.
+- **Secure Communication**: Utilizes RSA encryption to send and receive encrypted messages securely. `generate_rsa_key_pair()` used for generating the public, private key pair for the client.`encrypt_string()` to encrypt the message using the public key.`decrypt_string()` to decrypt the message using the private key.
+- `receive_updates_from_server()` is responsible for receiving messages from the server and call repsective functions for handling the messages depeding on the type(`MESSAGE_TYPE_JSON` or `MESSAGE_TYPE_FRAME`) and further differentiaing depending on the identifier sent in the JSON message.
 - **Video Streaming**: Requests and displays video streams from the server.
+- `handle_video_frame()`: Function responsible for receiving and displaying the frame data received from the server.
+- `handle_json_message()`: Function responsible for handling JSON and calling respective functions on the basis of the identifier.
+-`handle_buffer()`: Function responsible for handling messages(of type `MESSAGE_TYPE_JSON`) received while video streaming.
 - **User Interaction**: Provides a user-friendly interface for selecting options such as messaging other clients and streaming videos.
 
 ### Folder Structure
@@ -29,6 +37,7 @@ The `210010033_client.py` script allows clients to connect to the server, send e
 - `210010033_server.py`: Contains the server-side implementation.
 - `210010033_client.py`: Implements the client-side functionality.
 - `videos/`: Directory containing video files for streaming.
+-  `requirements.txt`: File containing python package list for smooth functioning of the project.
 
 ### Dependencies
 
