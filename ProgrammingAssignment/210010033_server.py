@@ -1,24 +1,38 @@
+# server handling everything
 import socket
 import sys
 import json
 import threading
 import cv2
-import pickle
 import struct
+import os
 
-# Video file definitions (replace with your paths)
-video_files = {
-    "240p": "videos/Video1_240p.mp4",
-    "720p": "videos/Video1_720p.mp4",
-    "1080p": "videos/Video1_1080p.mp4"
-}
+# Define message types
+MESSAGE_TYPE_JSON = 1
+MESSAGE_TYPE_FRAME = 2
 
-# List of videos
-video_list = ["Video1_240p.mp4", "Video1_720p.mp4", "Video1_1080p.mp4"]
+# This part is to handle the video files
+VIDEO_DIR = "videos/"
+
+nfiles = 0
+for f in os.listdir(VIDEO_DIR):
+    if(f.endswith('mp4')):
+        nfiles+=1
+  
+video_list = [[] for i in range(nfiles//3)]
+video_files = [[] for i in range(nfiles//3)]  
+
+for f in os.listdir(VIDEO_DIR):
+    if(f.endswith('mp4')):
+        i = int(f[5])
+        video_files[i-1].append(VIDEO_DIR + f)
+        video_list[i-1].append(f)
+
 
 # Create a TCP/IP socket
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 sock.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1)
+
 
 # Bind the socket to the port
 server_address = ('localhost', 10000)
@@ -31,74 +45,80 @@ sock.listen(5)
 global client_details
 client_details = dict() # name : public key
 lock = threading.Lock()
-# clients = []  # List to store connected client sockets
 client_socks = dict() # to store the socket : public key mapping
 
-# best to calculate all the messages outside this function and use this only for braodcasting
-def broadcast_dictionary(*args):
+
+# for packing message with its identifier
+def pack_message(message_type, message_data):
+     # Construct the message with header
+    if(message_type == MESSAGE_TYPE_FRAME):
+        header = struct.pack("!BI", message_type, len(message_data))
+        message = header + message_data
+    elif(message_type == MESSAGE_TYPE_JSON):
+        header = struct.pack("!BI", message_type, len(message_data))
+        message = header + message_data.encode()
+    return message
+
+            
+# Function to broadcast messages to all the clients
+def broadcast(message):
     global client_details, client_socks
-    # with lock: # gimini
-    if(len(args)==0):
-        message = {
-            "identifier": "broadcast_message",  # Use a suitable identifier value
-            "data": client_details
-        }
-    elif(len(args)==1):
-        message = {
-            "identifier": "AFK",  # Use a suitable identifier value
-            "data": client_details,
-            "name": args[0]
-        }
-    elif(len(args)==2):
-        message = {
-            "identifier" : "Communication",
-            "encrypt_message" : args[0],
-            "from" : args[1]
-        }
     updated_client_details_json = json.dumps(message)
+    updated_client_details_message = pack_message(MESSAGE_TYPE_JSON,updated_client_details_json)
     for client_socket in list(client_socks.keys()):
         try:
-            # broadcast only to the other clients HANDLE ITTTTTT
-            client_socket.sendall(updated_client_details_json.encode())
+            client_socket.sendall(updated_client_details_message)
         except:
             remove_client(client_socket)
 
-def stream_video(connection, message_json):
-    video_captures = {}
 
-    for resolution, path in video_files.items():
-        video_captures[resolution] = cv2.VideoCapture(path)
-
-    total_frames = min(vid.get(cv2.CAP_PROP_FRAME_COUNT) for vid in video_captures.values())
-    target_frames_per_resolution = int(total_frames // len(video_files))
-    
-    # Define frame ranges for each resolution
-    frame_ranges = {
-        "240p": (0, target_frames_per_resolution),
-        "720p": (target_frames_per_resolution, 2*target_frames_per_resolution),
-        "1080p": (2* target_frames_per_resolution, 3*target_frames_per_resolution)
-    }
-
-    # Video streaming loop
-    for resolution, frame_range in frame_ranges.items():
-        start_frame, end_frame = frame_range
-
-        vid = video_captures[resolution]
-        vid.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
-
-        for _ in range(start_frame, end_frame):
-            ret, frame = vid.read()
+# Function to stream video to a specific client connection
+def stream_video(connection, choice):
+    videos = video_files[choice-1]
+    frame_counts = [0] * len(videos)
+    current_file_index = 0
+    while current_file_index < len(videos):
+        cap = cv2.VideoCapture(videos[current_file_index])
+        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        start_frame = (total_frames // 3)*current_file_index
+        end_frame = (total_frames // 3) * (current_file_index+1)
+        
+        print("file_name: ",videos[current_file_index])
+        print("start_frame: ", start_frame, " end_frame: ", end_frame, "total_frames: ", total_frames)
+        
+        # for each frame
+        cap.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
+        while cap.isOpened():
+            ret, frame = cap.read()
             if not ret:
-                break  # Handle end of video for this resolution
+                break
+            current_frame = int(cap.get(cv2.CAP_PROP_POS_FRAMES))
 
-            frame_data = pickle.dumps(frame)
-            msg_size = struct.pack("Q", len(frame_data))
-            connection.sendall(msg_size + frame_data)
+            # Serialize frame
+            frame_data = cv2.imencode('.jpg', frame)[1].tobytes()
+            
+            # Send frame size and data
+            message = pack_message(MESSAGE_TYPE_FRAME,(str(len(frame_data))).encode().ljust(16) + frame_data)
+            connection.sendall(message)
+            
+            # print("Frame sent")
+            # Switch to the next file if one-third of frames sent
+            if  current_frame >= end_frame:
+                current_file_index += 1
+                break
+        
+        cap.release()
+    print("Stream Finished")
 
-    # Cleanup
-    for capture in video_captures.values():
-        capture.release()
+    # to aknowledge that streaming has finished
+    message = {
+        "identifier": "Video Finish"
+    }
+    message_json = json.dumps(message)
+    message = pack_message(MESSAGE_TYPE_JSON,message_json)
+    connection.sendall(message)
 
+# Function to remove a client connection when it quits and broadcast it to all the clients
 def remove_client(client_socket):
     global client_details, client_socks
     with lock:
@@ -111,75 +131,104 @@ def remove_client(client_socket):
                     del client_details[name]
                     break
             del client_socks[client_socket]
-            print("Removed client since it closed")
-            broadcast_dictionary(temp)
+            print(f"Removed client {temp} since it quit")
+            message = {
+                "identifier": "AFK",  
+                "data": client_details,
+                "name": temp
+            }
+            broadcast(message)
                     
 
+# Function to handle the client connection
 def handle_client_connection(connection, client_address):
     global client_details, client_socks
     try:
-        # while True:
-        # welcome_string1 = "Enter your name: "
-        # connection.sendall(welcome_string1.encode())
+        welcome_string1 = "Enter your name: "
+        connection.sendall(welcome_string1.encode())
         name_received = connection.recv(1024).decode()
         print("Name received:", name_received)
         
-        # welcome_string2 = "Enter the public key: "
-        # connection.sendall(welcome_string2.encode())
+        welcome_string2 = "Enter the public key: "
+        connection.sendall(welcome_string2.encode())
         public_key_received = connection.recv(4096).decode()
-        print("Public Key received:", public_key_received)
+        print(f"Public Key received from {name_received}")
         
         # Adding client details into the dictionary (thread-safe)
         with lock:
             client_details[name_received] = public_key_received
             client_socks[connection] = public_key_received
             
-        print("Current Client Details:", client_details)
+        # print("Current Client Details:", client_details)
         
-        # Sending the updated dictionary to the client 
         # Updating every client
         with lock:
-            broadcast_dictionary()
+            message = {
+                "identifier": "broadcast_message",  
+                "data": client_details,
+                "name" : name_received
+            }
+            broadcast(message)
             print("All Client Updated")
             
         while True:
-            message = connection.recv(4096).decode()
-            message_json = json.loads(message)
-            if(message_json["identifier"]=="QUIT"):
-                # move this into the broadcast function
-                message = {
-                    "identifier": "Disconnection"  # Use a suitable identifier value
-                }
-                connection.sendall(json.dumps(message).encode())
-                remove_client(connection)
-                client_thread.interrupt()
-            
-            if(message_json["identifier"]=="Communication"):
-                print("Incoming message from: ",message_json["from"])
-                broadcast_dictionary(message_json["encrypt_message"],message_json["from"])
-            
-            if(message_json["identifier"]=="Video"):
-                print("Streaming Video for ")
-                stream_video(connection, message_json)
-            
-            if(message_json["identifier"]=="Video List"):
-                message = {
-                    "identifier" : "Video List",
-                    "data" : video_list
-                }
-                connection.sendall(json.dumps(message).encode())
-            
-            if(message_json["identifier"]=="Video Choice"):
-                choice = message_json["choice"]
-                client_name = message_json["from"]
-                print(f"Playing {video_list[choice]} for {client_name}")
-                message = {
-                    "identifier" : "Video Choice",
-                    "aknowledgement" : "Ok"
-                }
-                connection.sendall(json.dumps(message).encode())
-                stream_video(connection, message_json, message_json["choice"])
-            
+            header = connection.recv(5)
+            try:
+                message_type, message_size = struct.unpack("!BI", header)
+                if(message_type == MESSAGE_TYPE_JSON):
+                    json_data = connection.recv(message_size).decode()
+                    message_json = json.loads(json_data)
+                    
+                    # handle when client quits
+                    if(message_json["identifier"]=="QUIT"):
+                        message = {
+                            "identifier": "Disconnection" 
+                        }
+                        message_json = json.dumps(message)
+                        message = pack_message(MESSAGE_TYPE_JSON,message_json)
+                        connection.sendall(message)
+                        remove_client(connection)
+                        client_thread.interrupt()
+                    
+                    # handle when client wants to communicate with another client
+                    if(message_json["identifier"]=="Communication"):
+                        print("Incoming message from: ",message_json["from"])
+                        message = {
+                            "identifier" : "Communication",
+                            "encrypt_message" : message_json["encrypt_message"],
+                            "from" : message_json["from"]
+                        }
+                        broadcast(message)
+                        print("Message Broadcasted")
+                    
+                    # handle when client wants the video list
+                    if(message_json["identifier"]=="Video List"):
+                        message = {
+                            "identifier" : "Video List",
+                            "data" : video_list
+                        }
+                        message_json = json.dumps(message)
+                        message = pack_message(MESSAGE_TYPE_JSON,message_json)
+                        connection.sendall(message)
+                    
+                    # handle when client sends the video choice it want to watch
+                    if(message_json["identifier"]=="Video Choice"):
+                        new_message = {
+                            "identifier" : "Video Frame",
+                        }
+                        message_j = json.dumps(new_message)
+                        message = pack_message(MESSAGE_TYPE_JSON,message_j)
+                        connection.sendall(message)
+                        choice = message_json["choice"]
+                        choice_no = int(choice[5])
+                        client_name = message_json["from"]
+                        print(f"Playing {choice} for {client_name}")
+                        stream_video(connection, choice=choice_no)
+            except ConnectionResetError:
+                remove_client(client_socket=connection)
+                break
+            except:
+                pass
 
     except KeyboardInterrupt:
         print("Server interrupted. Closing connections.")
@@ -190,6 +239,7 @@ def handle_client_connection(connection, client_address):
     finally:
         connection.close()
 
+# main part of the code, the one accepting client connections
 try:
     while True:
         # Accept incoming connections

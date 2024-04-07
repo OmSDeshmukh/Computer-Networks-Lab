@@ -12,6 +12,7 @@ video_files = [[] for i in range(nfiles//3)]
 
 for f in os.listdir(VIDEO_DIR):
     if(f.endswith('mp4')):
+        print(f)
         i = int(f[5])
         video_files[i-1].append(VIDEO_DIR + f)
         video_list[i-1].append(f)
