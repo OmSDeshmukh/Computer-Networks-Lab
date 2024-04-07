@@ -4,8 +4,10 @@ cryptography==42.0.5
 dnspython==2.6.1
 numpy==1.26.4
 opencv-python==4.9.0.80
+opencv-python-headless==4.9.0.80
 psutil==5.9.8
 pycparser==2.22
+pycryptodome==3.20.0
 pymongo==4.6.3
 python-dateutil==2.9.0.post0
 six==1.16.0
