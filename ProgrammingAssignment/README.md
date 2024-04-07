@@ -6,14 +6,18 @@ The project consists of two main scripts: `210010033_server.py` for the server-s
 
 The `210010033_server.py` script handles incoming client connections, manages client details, and facilitates secure communication and video streaming. Here's an overview of its key functions:
 
-- Every time a new client joins, a thread is created for handling its connnection
-- **`handle_client_connection()`**: Uses threading to handle multiple client connections concurrently. Its is responsible for receiving messages from the client in JSON format and call respective function to handle the requests.
-- **Client Details Management**:Client details (names and public keys) for secure communication using RSA encryption are stored in the `client_details` dictionary.
-- **`broadcast()`**: A function responsible for broadcasting messages to all the clients currently connected to the server.
-- **`remove_client()`**: A function used to update dictionary whenever a client quits.
-- **`stream_video()`**: A function reponsible for streaming video frame by frame to the client.
-- **`pack_message()`**: A function for packing messages into a struct for communication purposes
-- **Note**: There are two types of messages shared between server and client, one is JSON having identifier `MESSAGE_TYPE_JSON` and another is the frame data having `MESSAGE_TYPE_FRAME`. The usual messaging between the server and client occurs through JSON. For streaming video, frame data is sent via capturing through cv2.
+- **Client Handling**: Every time a new client joins, a thread is created for handling its connnection
+    - **`handle_client_connection()`**: Uses threading to handle multiple client connections concurrently. Its is responsible for receiving messages from the client in JSON format and call respective function to handle the requests.
+    - **Client Details Management**:Client details (names and public keys) for secure communication using RSA encryption are stored in the `client_details` dictionary.
+- **Message Broadcasting**:
+    - **`broadcast()`**: A function responsible for broadcasting messages to all the clients currently connected to the server.
+    - **`remove_client()`**: A function used to update dictionary whenever a client quits and broadcast a message accordingly.
+- **Video Streaming**:
+    - **`stream_video()`**: A function reponsible for streaming video frame by frame to the client.
+- **Message structure**:
+    - There are two types of messages shared between server and client, one is JSON having identifier `MESSAGE_TYPE_JSON` and another is the frame data having `MESSAGE_TYPE_FRAME`. The usual messaging between the server and client occurs through JSON. For streaming video, frame data is sent via capturing through cv2.
+    - **`pack_message()`**: A function for packing messages into a struct for communication purposes
+
 
 ### Client Script (`210010033_client.py`)
 
