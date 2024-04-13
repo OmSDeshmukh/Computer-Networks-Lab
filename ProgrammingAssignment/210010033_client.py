@@ -162,7 +162,7 @@ def handle_video_frame(sock):
                 frame = cv2.resize(frame, (1280, 720))
 
                 # Display frame
-                # cv2.imshow('Video Stream', frame) # Not working on Mac
+                cv2.imshow('Video Stream', frame) # Not working on Mac
                 
                 if cv2.waitKey(1) & 0xFF == ord('q'):
                     break

@@ -55,7 +55,6 @@ def stream_video(connection, choice):
     videos.append(f"videos/{choice}_240p.mp4")
     videos.append(f"videos/{choice}_720p.mp4")
     videos.append(f"videos/{choice}_1440p.mp4")
-    # frame_counts = [0] * len(videos)
     current_file_index = 0
     while current_file_index < len(videos):
         cap = cv2.VideoCapture(videos[current_file_index])
