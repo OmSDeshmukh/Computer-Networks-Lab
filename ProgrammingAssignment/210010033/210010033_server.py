@@ -200,7 +200,8 @@ def handle_client_connection(connection, client_address):
                         message = pack_message(MESSAGE_TYPE_JSON,message_j)
                         connection.sendall(message)
                         choice = message_json["choice"]
-                        choice = choice.split('_')[0]
+                        # choice = choice.split('_')[0]
+                        choice = choice[:choice.rfind('_')]
                         client_name = message_json["from"]
                         print(f"Playing {choice} for {client_name}")
                         stream_video(connection, choice=choice)

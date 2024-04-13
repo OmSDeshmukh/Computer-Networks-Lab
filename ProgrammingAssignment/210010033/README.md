@@ -85,7 +85,7 @@ python 210010033_client.py
 
 #### Note:
 - Ensure that the server is running before starting any client connections.
-- Video files should be placed in the videos/ directory on the server side and each file name _should_ have all the three required qualities present with `<video_name>_<quality>.mp4` where `quality` can take the values 240p, 720p and 1440p. Also, `video_name` should not contain any underscores '_' symbol.
+- Video files should be placed in the videos/ directory on the server side and each file name _should_ have all the three required qualities present with `<video_name>_<quality>.mp4` where `quality` can take the values 240p, 720p and 1440p.
 
 ### Demo Video
 [Click here](https://drive.google.com/file/d/1nXJAHAFTE8iFEYO_nRaVGMvDGlVhdOZK/view?usp=sharing)
