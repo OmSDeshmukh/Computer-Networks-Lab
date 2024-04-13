@@ -61,21 +61,21 @@ print(sslClientSocket.recv(1024))
 # Send MAIL FROM command and print server response.
 #Fill in start 
 sslClientSocket.sendall(f"MAIL FROM:<{userEmail}>\r\n".encode()) 
-res = sslClientSocket.recv(1024) 
+res = sslClientSocket.recv(1024).decode() 
 print(res)
 #Fill in end 
 
 # Send RCPT TO command and print server response.
 # Fill in start
 sslClientSocket.send(f"RCPT TO:<{userDestinationEmail}>\r\n".encode()) 
-res = sslClientSocket.recv(1024) 
+res = sslClientSocket.recv(1024).decode() 
 print(res)
 # Fill in end 
 
 # Send DATA command and print server response. 
 #Fill in start 
 sslClientSocket.send("DATA\r\n".encode()) 
-res = sslClientSocket.recv(1024) 
+res = sslClientSocket.recv(1024).decode() 
 print(res)
 #Fill in end 
 
@@ -89,7 +89,7 @@ sslClientSocket.send(msg.encode())
 # Message ends with a single period. 
 #Fill in start 
 sslClientSocket.send("\r\n.\r\n".encode())
-res = sslClientSocket.recv(1024) 
+res = sslClientSocket.recv(1024).decode() 
 print(res)
 #Fill in end 
 

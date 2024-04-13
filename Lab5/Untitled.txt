@@ -1,0 +1,35 @@
+srihari@srihari-lenovo-ideapad-s540-15iml-d:~/Downloads/210010033_210030035_lab6$ make part2_3
+g++ -o part2_3 part2_3.cpp -std=c++11
+time ./part2_3 image.ppm output_part2_3.ppm
+19.16user 17.11system 0:25.71elapsed 141%CPU (0avgtext+0avgdata 197888maxresident)k
+0inputs+298992outputs (0major+101833minor)pagefaults 0swaps
+srihari@srihari-lenovo-ideapad-s540-15iml-d:~/Downloads/210010033_210030035_lab6$ make part2_2
+g++ -o part2_2 part2_2.cpp -std=c++11
+time ./part2_2 image.ppm output_part2_2.ppm
+9.98user 6.88system 0:21.31elapsed 79%CPU (0avgtext+0avgdata 294912maxresident)k
+0inputs+192992outputs (0major+99591minor)pagefaults 0swaps
+srihari@srihari-lenovo-ideapad-s540-15iml-d:~/Downloads/210010033_210030035_lab6$ make part2_1b
+g++ -o part2_1b part2_1b.cpp -std=c++11
+time ./part2_1b image.ppm output__part2_1b.ppm
+18.26user 7.68system 0:18.91elapsed 137%CPU (0avgtext+0avgdata 198144maxresident)k
+0inputs+192992outputs (0major+48809minor)pagefaults 0swaps
+srihari@srihari-lenovo-ideapad-s540-15iml-d:~/Downloads/210010033_210030035_lab6$ make part2_1a
+g++ -o part2_1a part2_1a.cpp -std=c++11
+time ./part2_1a image.ppm output__part2_1a.ppm
+21.59user 0.61system 0:17.38elapsed 127%CPU (0avgtext+0avgdata 198272maxresident)k
+0inputs+192992outputs (0major+48806minor)pagefaults 0swaps
+srihari@srihari-lenovo-ideapad-s540-15iml-d:~/Downloads/210010033_210030035_lab6$ make part_1
+g++     part_1.cpp   -o part_1
+srihari@srihari-lenovo-ideapad-s540-15iml-d:~/Downloads/210010033_210030035_lab6$ make part1
+g++ -o p1_obj part_1.cpp -std=c++11
+time ./p1_obj image.ppm output_part1.ppm
+10.94user 0.55system 0:11.65elapsed 98%CPU (0avgtext+0avgdata 197888maxresident)k
+0inputs+192992outputs (0major+48793minor)pagefaults 0swaps
+srihari@srihari-lenovo-ideapad-s540-15iml-d:~/Downloads/210010033_210030035_lab6$ ^C
+srihari@srihari-lenovo-ideapad-s540-15iml-d:~/Downloads/210010033_210030035_lab6$ ^C
+srihari@srihari-lenovo-ideapad-s540-15iml-d:~/Downloads/210010033_210030035_lab6$ m
+ake part1
+g++ -o p1_obj part_1.cpp -std=c++11
+time ./p1_obj image.ppm output_part1.ppm
+14.97user 0.75system 0:17.37elapsed 90%CPU (0avgtext+0avgdata 197888maxresident)k
+0inputs+192992outputs (0major+48794minor)pagefaults 0swaps
