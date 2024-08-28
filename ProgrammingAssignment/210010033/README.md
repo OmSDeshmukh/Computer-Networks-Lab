@@ -1,4 +1,4 @@
-## Computer Networks Programming Assignment
+# SecureStreamServer
 
 - This Python application is a basic video chat system that utilizes sockets for client-server communication. It ensures secure transmission through RSA encryption for messages. Users can exchange text messages and request video streaming from the server, with video frames being transmitted over the network. The users are also notified of other user joining or leaving the server.
 
